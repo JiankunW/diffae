@@ -84,7 +84,8 @@ class BeatGANsAutoencModel(BeatGANsUNetModel):
 
     def encode(self, x):
         cond = self.encoder.forward(x)
-        return {'cond': cond}
+        # return {'cond': cond}
+        return cond
 
     @property
     def stylespace_sizes(self):
@@ -148,8 +149,9 @@ class BeatGANsAutoencModel(BeatGANsUNetModel):
             if x is not None:
                 assert len(x) == len(x_start), f'{len(x)} != {len(x_start)}'
 
-            tmp = self.encode(x_start)
-            cond = tmp['cond']
+            # tmp = self.encode(x_start)
+            # cond = tmp['cond']
+            cond = self.encode(x_start)
 
         if t is not None:
             _t_emb = timestep_embedding(t, self.conf.model_channels)
