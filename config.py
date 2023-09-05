@@ -162,6 +162,8 @@ class TrainConfig(BaseConfig):
     work_cache_dir: str = os.path.expanduser('~/mycache')
     # to be overridden
     name: str = ''
+    # (jonas) add configs
+    pdae_encoder_name: str = ''
 
     def __post_init__(self):
         self.batch_size_eval = self.batch_size_eval or self.batch_size
@@ -418,6 +420,7 @@ class TrainConfig(BaseConfig):
                 net_beatgans_resnet_use_zero_module,
                 latent_net_conf=latent_net_conf,
                 resnet_cond_channels=self.net_beatgans_resnet_cond_channels,
+                pdae_encoder_name=self.pdae_encoder_name,
             )
         else:
             raise NotImplementedError(self.model_name)

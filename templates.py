@@ -100,6 +100,15 @@ def celeba64d2c_autoenc():
     conf.name = 'celeba64d2c_autoenc'
     return conf
 
+def celeba64d2c_autoenc_pdae_encoder():
+    conf = ffhq64_autoenc()
+    conf.data_name = 'celebalmdb'
+    conf.eval_every_samples = 10_000_000
+    conf.eval_ema_every_samples = 10_000_000
+    conf.total_samples = 72_000_000
+    conf.name = 'celeba64d2c_autoenc_pdae_encoder'
+    conf.pdae_encoder_name = 'CELEBA64Encoder'
+    return conf
 
 def ffhq128_ddpm():
     conf = ddpm()
@@ -199,6 +208,14 @@ def ffhq128_autoenc_130M():
     conf.name = 'ffhq128_autoenc_130M'
     return conf
 
+def ffhq128_autoenc_130M_pdae_encoder():
+    conf = ffhq128_autoenc_base()
+    conf.total_samples = 130_000_000
+    conf.eval_ema_every_samples = 10_000_000
+    conf.eval_every_samples = 10_000_000
+    conf.name = 'ffhq128_autoenc_130M_pdae_encoder'
+    conf.pdae_encoder_name = 'FFHQ128Encoder'
+    return conf
 
 def horse128_ddpm():
     conf = ffhq128_ddpm()
