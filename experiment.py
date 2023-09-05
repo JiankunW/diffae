@@ -16,6 +16,7 @@ from torch.distributions import Categorical
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataset import ConcatDataset, TensorDataset
 from torchvision.utils import make_grid, save_image
+from matplotlib import pyplot as plt
 
 from config import *
 from dataset import *
@@ -81,6 +82,8 @@ class LitModel(pl.LightningModule):
         else:
             self.conds_mean = None
             self.conds_std = None
+
+        self.reset_loss_log()
 
     def normalize(self, cond):
         cond = (cond - self.conds_mean.to(self.device)) / self.conds_std.to(
@@ -392,6 +395,7 @@ class LitModel(pl.LightningModule):
                 raise NotImplementedError()
 
             loss = losses['loss'].mean()
+            loss_batch = losses['loss']
             # divide by accum batches to make the accumulated gradient exact!
             for key in ['loss', 'vae', 'latent', 'mmd', 'chamfer', 'arg_cnt']:
                 if key in losses:
@@ -405,7 +409,7 @@ class LitModel(pl.LightningModule):
                         self.logger.experiment.add_scalar(
                             f'loss/{key}', losses[key], self.num_samples)
 
-        return {'loss': loss}
+        return {'loss': loss, 'loss_batch': loss_batch.detach(), 'timesteps': t}
 
     def on_train_batch_end(self, outputs, batch, batch_idx: int,
                            dataloader_idx: int) -> None:
@@ -428,7 +432,8 @@ class LitModel(pl.LightningModule):
             else:
                 imgs = batch['img']
             self.log_sample(x_start=imgs)
-            self.evaluate_scores()
+            # self.evaluate_scores()
+            self.log_loss_hist(outputs['loss_batch'], outputs['timesteps'])
 
     def on_before_optimizer_step(self, optimizer: Optimizer,
                                  optimizer_idx: int) -> None:
@@ -569,6 +574,40 @@ class LitModel(pl.LightningModule):
                 else:
                     do(self.model, '', use_xstart=True, save_real=True)
                     do(self.ema_model, '_ema', use_xstart=True, save_real=True)
+
+    def log_loss_hist(self, losses, timesteps):
+        """
+        plot hisogram of average loss for each time-step during training
+        :param losses: (Tensor) [B]
+        :param timesteps: (Tensor) [B]
+        """
+        pdae_loss_batch, _ = np.histogram(
+            timesteps.cpu().numpy(),
+            bins=np.arange(self.conf.T),
+            weights=losses.cpu().numpy(),
+            density=False
+        )
+        if self.pdae_loss_log is None:
+            self.pdae_loss_log = pdae_loss_batch
+        else:
+            self.pdae_loss_log += pdae_loss_batch
+
+        if self.conf.eval_every_samples > 0 and self.num_samples > 0 and is_time(
+                self.num_samples, self.conf.eval_every_samples,
+                self.conf.batch_size_effective) and self.pdae_loss_log is not None:
+            pdae_loss_logs = self.all_gather(self.pdae_loss_log)
+            pdae_loss_log = pdae_loss_logs.mean(dim=0).cpu().numpy()
+            if self.global_rank == 0:
+                loss_dir = os.path.join(self.conf.logdir, f'loss')
+                if not os.path.exists(loss_dir):
+                    os.makedirs(loss_dir)
+                plt.bar(np.arange(self.conf.T-1), pdae_loss_log, width=0.5)
+                plt.savefig(os.path.join(loss_dir, "loss{}k.png".format(self.num_samples // 1000)))
+                plt.clf()
+            self.reset_loss_log()
+
+    def reset_loss_log(self):
+        self.pdae_loss_log = None
 
     def evaluate_scores(self):
         """
