@@ -602,7 +602,7 @@ class LitModel(pl.LightningModule):
                 if not os.path.exists(loss_dir):
                     os.makedirs(loss_dir)
                 plt.bar(np.arange(self.conf.T-1), pdae_loss_log, width=0.5)
-                plt.savefig(os.path.join(loss_dir, "loss{}k.png".format(self.num_samples // 1000)))
+                plt.savefig(os.path.join(loss_dir, "loss{}k.png".format(self.global_step // 1000)))
                 plt.clf()
             self.reset_loss_log()
 
