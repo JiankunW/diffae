@@ -7,7 +7,7 @@ from torch.nn.functional import silu
 from .latentnet import *
 from .unet import *
 from choices import *
-
+import model as model_modules
 
 @dataclass
 class BeatGANsAutoencConfig(BeatGANsUNetConfig):
@@ -19,6 +19,7 @@ class BeatGANsAutoencConfig(BeatGANsUNetConfig):
     enc_channel_mult: Tuple[int] = None
     enc_grad_checkpoint: bool = False
     latent_net_conf: MLPSkipNetConfig = None
+    pdae_encoder_name: str = ''
 
     def make_model(self):
         return BeatGANsAutoencModel(self)
@@ -35,27 +36,33 @@ class BeatGANsAutoencModel(BeatGANsUNetModel):
             time_out_channels=conf.embed_channels,
         )
 
-        self.encoder = BeatGANsEncoderConfig(
-            image_size=conf.image_size,
-            in_channels=conf.in_channels,
-            model_channels=conf.model_channels,
-            out_hid_channels=conf.enc_out_channels,
-            out_channels=conf.enc_out_channels,
-            num_res_blocks=conf.enc_num_res_block,
-            attention_resolutions=(conf.enc_attn_resolutions
-                                   or conf.attention_resolutions),
-            dropout=conf.dropout,
-            channel_mult=conf.enc_channel_mult or conf.channel_mult,
-            use_time_condition=False,
-            conv_resample=conf.conv_resample,
-            dims=conf.dims,
-            use_checkpoint=conf.use_checkpoint or conf.enc_grad_checkpoint,
-            num_heads=conf.num_heads,
-            num_head_channels=conf.num_head_channels,
-            resblock_updown=conf.resblock_updown,
-            use_new_attention_order=conf.use_new_attention_order,
-            pool=conf.enc_pool,
-        ).make_model()
+        if not conf.pdae_encoder_name:
+            self.encoder = BeatGANsEncoderConfig(
+                image_size=conf.image_size,
+                in_channels=conf.in_channels,
+                model_channels=conf.model_channels,
+                out_hid_channels=conf.enc_out_channels,
+                out_channels=conf.enc_out_channels,
+                num_res_blocks=conf.enc_num_res_block,
+                attention_resolutions=(conf.enc_attn_resolutions
+                                    or conf.attention_resolutions),
+                dropout=conf.dropout,
+                channel_mult=conf.enc_channel_mult or conf.channel_mult,
+                use_time_condition=False,
+                conv_resample=conf.conv_resample,
+                dims=conf.dims,
+                use_checkpoint=conf.use_checkpoint or conf.enc_grad_checkpoint,
+                num_heads=conf.num_heads,
+                num_head_channels=conf.num_head_channels,
+                resblock_updown=conf.resblock_updown,
+                use_new_attention_order=conf.use_new_attention_order,
+                pool=conf.enc_pool,
+            ).make_model()
+        else:
+            encoder_cls = getattr(model_modules, conf.pdae_encoder_name, None)
+            if encoder_cls is None:
+                raise AttributeError(f"Encoder Module '{conf.pdae_encoder_name}' not found.")
+            self.encoder = encoder_cls(latent_dim=conf.enc_out_channels)
 
         if conf.latent_net_conf is not None:
             self.latent_net = conf.latent_net_conf.make_model()

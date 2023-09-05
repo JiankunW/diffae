@@ -1,0 +1,82 @@
+import torch.nn as nn
+from .pdae_module import AttentionBlock, normalization, View
+
+
+class FFHQ128Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.latent_dim = kwargs["latent_dim"]
+
+        self.encoder = nn.Sequential(
+
+            nn.Conv2d(3, 64, (3, 3), (2, 2), 1),          # batch_size x 64 x 64 x 64
+
+            normalization(64),
+            nn.SiLU(True),
+            nn.Conv2d(64, 128, (3, 3), (2, 2), 1),          # batch_size x 128 x 32 x 32
+
+            normalization(128),
+            nn.SiLU(True),
+            nn.Conv2d(128, 256, (3, 3), (2, 2), 1),         # batch_size x 256 x 16 x 16
+
+            AttentionBlock(256, 4, -1, False),
+
+            normalization(256),
+            nn.SiLU(True),
+            nn.Conv2d(256, 256, (3, 3), (2, 2), 1),          # batch_size x 256 x 8 x 8
+
+            normalization(256),
+            nn.SiLU(True),
+            nn.Conv2d(256, 256, (3, 3), (2, 2), 1),          # batch_size x 256 x 4 x 4
+
+            normalization(256),
+            nn.SiLU(True),
+            View((-1, 256 * 4 * 4)),                  # batch_size x 4096
+            nn.Linear(4096, self.latent_dim)
+        )
+
+    # x: batch_size x 3 x 128 x 128
+    def forward(self, x):
+        # batch_size x latent_dim
+        return self.encoder(x)
+
+
+class CELEBA64Encoder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.latent_dim = kwargs["latent_dim"]
+        self.dropout = kwargs.get("dropout", 0.0)
+
+        modules = [
+
+            nn.Conv2d(3, 64, (3, 3), (2, 2), 1),          # batch_size x 64 x 32 x 32
+
+            normalization(64),
+            nn.SiLU(True),
+            nn.Conv2d(64, 128, (3, 3), (2, 2), 1),          # batch_size x 128 x 16 x 16
+
+            AttentionBlock(128, 4, -1, False),
+
+            normalization(128),
+            nn.SiLU(True),
+            nn.Conv2d(128, 128, (3, 3), (2, 2), 1),          # batch_size x 128 x 8 x 8
+
+            normalization(128),
+            nn.SiLU(True),
+            nn.Conv2d(128, 128, (3, 3), (2, 2), 1),          # batch_size x 128 x 4 x 4
+
+            normalization(128),
+            nn.SiLU(True),
+            View((-1, 128 * 4 * 4)),                  # batch_size x 2048
+        ]
+        modules.append(nn.Linear(2048, self.latent_dim))
+        if self.dropout > 0: modules.append(nn.Dropout(self.dropout))
+
+        self.encoder = nn.Sequential(*modules)
+
+    # x: batch_size x 3 x 64 x 64
+    def forward(self, x):
+        # batch_size x latent_dim
+        return self.encoder(x)
