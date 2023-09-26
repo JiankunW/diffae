@@ -13,3 +13,9 @@ datasets/celeba
 checkpoints
 
 .ipynb_checkpoints/
+archive
+launch.json
+*.ipynb
+runs
+*.zip
+datasets/
